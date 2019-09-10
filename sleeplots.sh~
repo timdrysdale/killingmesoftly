@@ -1,0 +1,4 @@
+#!/bin/bash
+./sleepsoundly.sh &
+./sleepsoundly.sh &
+./sleepsoundly.sh &

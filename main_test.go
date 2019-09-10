@@ -139,6 +139,50 @@ func TestPIDNoChildren(t *testing.T) {
 
 }
 
+func TestPIDWithChildren(t *testing.T) {
+
+	command := "./sleeplots.sh"
+	if _, err := os.Stat("./sleep.log"); err == nil {
+		if err := os.Remove("./sleep.log"); err != nil {
+			log.Fatalf("Error removing sleep.log: %v", err)
+		}
+	}
+
+	closed := make(chan struct{})
+	finished := make(chan struct{})
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func() {
+		runCommandPID(closed, &wg, command)
+		close(finished)
+	}()
+
+	<-time.After(100 * time.Millisecond)
+
+	close(closed)
+
+	select {
+	case <-time.After(time.Second):
+		t.Error("time out waiting for kill")
+	case <-finished:
+	}
+
+	//  wait for child proceses to finish, if still running
+	<-time.After(3 * time.Second)
+	n, err := countlines("./sleep.log")
+	if err != nil {
+		t.Fatalf("Error reading file was %v", err)
+	}
+
+	if n > 3 {
+		t.Fatalf("Child processes were not killed: %d lines in file, wanted 3\n", n)
+	}
+
+}
+
 func TestGIDWithChildren(t *testing.T) {
 
 	command := "./sleeplots.sh"

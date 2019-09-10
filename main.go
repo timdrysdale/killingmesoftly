@@ -36,7 +36,7 @@ func runCommandPID(closed <-chan struct{}, wg *sync.WaitGroup, command string) {
 
 		case <-closed:
 
-			if err := cmd.Process.Signal(os.Interrupt); err != nil {
+			if err := cmd.Process.Kill(); err != nil {
 				log.Fatalf("failed to kill process: %v", err)
 			}
 			return

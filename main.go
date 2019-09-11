@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/exec"
@@ -13,15 +14,15 @@ func main() {
 	//do nothing
 }
 
-func runCommandPID(closed <-chan struct{}, wg *sync.WaitGroup, command string) {
+func runCommandPID(closed <-chan struct{}, wg *sync.WaitGroup, command string) error {
 	defer wg.Done()
 
 	tokens := strings.Split(command, " ")
 	cmd := exec.Command(tokens[0], tokens[1:]...)
 	cmd.Stdout = os.Stdout
+
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
 	finished := make(chan struct{})
@@ -37,12 +38,13 @@ func runCommandPID(closed <-chan struct{}, wg *sync.WaitGroup, command string) {
 		case <-closed:
 
 			if err := cmd.Process.Kill(); err != nil {
-				log.Fatalf("failed to kill process: %v", err)
+				return err
+			} else {
+				return nil
 			}
-			return
 
 		case <-finished:
-			return
+			return nil
 		}
 
 	}
@@ -90,5 +92,38 @@ func runCommandGID(closed <-chan struct{}, wg *sync.WaitGroup, command string) {
 		}
 
 	}
+
+}
+
+func runCommandContext(closed <-chan struct{}, wg *sync.WaitGroup, command string) error {
+	defer wg.Done()
+
+	tokens := strings.Split(command, " ")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, tokens[0], tokens[1:]...)
+
+	cmd.Stdout = os.Stdout
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	finished := make(chan struct{})
+
+	go func() {
+		_ = cmd.Wait()
+		close(finished)
+	}()
+
+	select {
+	case <-closed:
+		cancel()
+	case <-finished:
+	}
+
+	return nil
 
 }

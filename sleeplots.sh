@@ -1,4 +1,2 @@
 #!/bin/bash
-./sleeploudly.sh &
-./sleeploudly.sh &
-./sleeploudly.sh &
+setsid sh -c './sleeploudly.sh ${1} & ./sleeploudly.sh ${1}& ./sleeploudly.sh ${1}&'

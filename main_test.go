@@ -96,7 +96,7 @@ func TestPIDIgnores2(t *testing.T) {
 
 func TestPIDNoChildren(t *testing.T) {
 
-	command := "./sleeploudly.sh"
+	command := "./sleeploudly.sh 1"
 
 	if _, err := os.Stat("./sleep.log"); err == nil {
 		if err := os.Remove("./sleep.log"); err != nil {
@@ -127,10 +127,10 @@ func TestPIDNoChildren(t *testing.T) {
 	}
 
 	//  wait for child proceses to finish, if still running
-	<-time.After(3 * time.Second)
+	<-time.After(1200 * time.Millisecond)
 	n, err := countlines("./sleep.log")
 	if err != nil {
-		t.Fatalf("Error reading file was %v", err)
+		t.Fatalf("Error reading file was: %v", err)
 	}
 
 	if n > 1 {
@@ -139,9 +139,57 @@ func TestPIDNoChildren(t *testing.T) {
 
 }
 
+func TestContextCancelWithChildren(t *testing.T) {
+
+	command := "./sleeplots.sh 1"
+
+	if _, err := os.Stat("./sleep.log"); err == nil {
+		if err := os.Remove("./sleep.log"); err != nil {
+			log.Fatalf("Error removing sleep.log: %v", err)
+		}
+	}
+
+	closed := make(chan struct{})
+	finished := make(chan struct{})
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func() {
+		runCommandContext(closed, &wg, command)
+		close(finished)
+	}()
+
+	<-time.After(100 * time.Millisecond)
+
+	close(closed)
+
+	select {
+	case <-time.After(time.Second):
+		t.Error("time out waiting for kill")
+	case <-finished:
+	}
+
+	//  wait for child proceses to finish, if still running
+	//  then check it if it has still been active
+	//  Each sub-processes writes to file twice, at start and end of a sleep
+	<-time.After(1500 * time.Millisecond)
+	n, err := countlines("./sleep.log")
+	if err != nil {
+		t.Fatalf("Error reading file was: %v", err)
+	}
+
+	if n > 3 {
+		t.Fatalf("Child processes were not killed: %d lines in file, wanted 3\n", n)
+	}
+
+}
+
 func TestPIDWithChildren(t *testing.T) {
 
-	command := "./sleeplots.sh"
+	command := "./sleeplots.sh 1"
+
 	if _, err := os.Stat("./sleep.log"); err == nil {
 		if err := os.Remove("./sleep.log"); err != nil {
 			log.Fatalf("Error removing sleep.log: %v", err)
@@ -171,10 +219,12 @@ func TestPIDWithChildren(t *testing.T) {
 	}
 
 	//  wait for child proceses to finish, if still running
-	<-time.After(3 * time.Second)
+	//  then check it if it has still been active
+	//  Each sub-processes writes to file twice, at start and end of a sleep
+	<-time.After(1500 * time.Millisecond)
 	n, err := countlines("./sleep.log")
 	if err != nil {
-		t.Fatalf("Error reading file was %v", err)
+		t.Fatalf("Error reading file was: %v", err)
 	}
 
 	if n > 3 {
@@ -183,9 +233,103 @@ func TestPIDWithChildren(t *testing.T) {
 
 }
 
+func TestPIDWithChildrenSetuidC(t *testing.T) {
+
+	command := "setsid -c ./sleeplots.sh 1"
+
+	if _, err := os.Stat("./sleep.log"); err == nil {
+		if err := os.Remove("./sleep.log"); err != nil {
+			log.Fatalf("Error removing sleep.log: %v", err)
+		}
+	}
+
+	closed := make(chan struct{})
+	finished := make(chan struct{})
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func() {
+		runCommandPID(closed, &wg, command)
+		close(finished)
+	}()
+
+	<-time.After(100 * time.Millisecond)
+
+	close(closed)
+
+	select {
+	case <-time.After(time.Second):
+		t.Error("time out waiting for kill")
+	case <-finished:
+	}
+
+	//  wait for child proceses to finish, if still running
+	//  then check it if it has still been active
+	//  Each sub-processes writes to file twice, at start and end of a sleep
+	<-time.After(1500 * time.Millisecond)
+	n, err := countlines("./sleep.log")
+	if err != nil {
+		t.Fatalf("Error reading file was: %v", err)
+	}
+
+	if n > 3 {
+		t.Fatalf("Child processes were not killed: %d lines in file, wanted 3\n", n)
+	}
+
+}
+
+func TestPIDWithChildrenSetuid(t *testing.T) {
+
+	command := "setsid ./sleeplots.sh 1"
+
+	if _, err := os.Stat("./sleep.log"); err == nil {
+		if err := os.Remove("./sleep.log"); err != nil {
+			log.Fatalf("Error removing sleep.log: %v", err)
+		}
+	}
+
+	closed := make(chan struct{})
+	finished := make(chan struct{})
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func() {
+		runCommandPID(closed, &wg, command)
+		close(finished)
+	}()
+
+	<-time.After(100 * time.Millisecond)
+
+	close(closed)
+
+	select {
+	case <-time.After(time.Second):
+		t.Error("time out waiting for kill")
+	case <-finished:
+	}
+
+	//  wait for child proceses to finish, if still running
+	//  then check it if it has still been active
+	//  Each sub-processes writes to file twice, at start and end of a sleep
+	<-time.After(1500 * time.Millisecond)
+	n, err := countlines("./sleep.log")
+	if err != nil {
+		t.Fatalf("Error reading file was: %v", err)
+	}
+
+	if n > 3 {
+		t.Fatalf("Child processes were not killed: %d lines in file, wanted 3\n", n)
+	}
+
+}
 func TestGIDWithChildren(t *testing.T) {
 
-	command := "./sleeplots.sh"
+	command := "./sleeplots.sh 1"
+
 	if _, err := os.Stat("./sleep.log"); err == nil {
 		if err := os.Remove("./sleep.log"); err != nil {
 			log.Fatalf("Error removing sleep.log: %v", err)
@@ -215,7 +359,7 @@ func TestGIDWithChildren(t *testing.T) {
 	}
 
 	//  wait for child proceses to finish, if still running
-	<-time.After(3 * time.Second)
+	<-time.After(1200 * time.Millisecond)
 	n, err := countlines("./sleep.log")
 	if err != nil {
 		t.Fatalf("Error reading file was %v", err)
